@@ -1,0 +1,369 @@
+Lecture 2 GPUs
+9/12/2018
+
+Pros of dynamically linked = memory efficiency, executable is much smaller
+Cons = loading time is longer and under mercy of users version of library
+	this is why some software has version minimums
+
+Dynamically linked is better if there is a memory problem
+
+GPU cannot access disk so has to go from mem to disk, need to reduce transfer as much as possible
+GPU also has smaller mem size so take this into account with whether to statically link or dynamically link libraries
+
+Rendering: deals with min number of frames that we can see so something appears animated. 24 frames.
+
+GPU is closest to SIMD: Multiple data, Single Instruction (ppt 2, pg 24)
+
+GPU mem has higher bandwidth than CPU mem
+CPU mem is faster, and...something else...
+
+GPU has virtual memory
+
+
+Lecture 4 9/26
+GPU 
+
+Intro to CUDA
+
+Vector Addition
+Need 10M for problem to give good performance
+sometimes parallelism is too big to fit to GPU memory
+
+CUDA Mem Model
+	global memory is slowest
+	graphics mem is designed for bandwidth, not for latency
+
+CPU & GPU Memory
+	separate memory, we're losing performance moving stuff back and forth
+	fusion: if CPU and GPU are on the same chip shared memory space L3 cache but sacrificing computational strength for communication, weaker GPU
+
+CUDA device mem allocation
+	malloc allocates object to global mem
+	need address of the pointer ie. cudaMalloc((void**)&Md, size);
+	(malloc and free are APIs, new and delete arent)
+	asynchronous transfer = when you call it you will run it, it will not wait
+
+Vector Addition Example
+	all blocks and threads have same dimensions
+	all blocks must be the same size (32)
+	once block is assigned to 1 SM it will stay with that SM until execution
+	All threads will have unique IDS: int i = threadIdx.x + blockDim.x * 		blockIdx.x;
+
+Programming: Matrix Multiplication
+	NO RECURSION! No static variable declarations, no indirect function calls through pointers
+
+Measures of Success for GPU Code
+1. Compare GPU code to multiprocessor rather than CPU
+2. How scalable is your code? If problem size increases is your code still efficient?
+
+When you want to write GPU code, first write sequential and then bad CUDA and then enhance bad CUDA
+	sequential code will help you see where the bottlenecks are
+
+Assumptions of Matrix Mult Example
+1. assuming every thread will do 1 element of the matrix
+2. assumption that theres only 1 block (only x and y)
+	whats bad about just 1 block? 
+		is that we are losing parallelism 
+		upper bound on GPU of number of threads you can use per block, some problems might not get solved
+
+Dim3 Type
+	x,y,z is way of passing more than 1 dimension
+
+Be Sure to Know:
+	mx dimensions of block
+	mx num threads per block
+	mx dimensions of grid
+	mx number of blocks per GRID*** 
+
+	you can know this by using compute capability: API can give you this
+
+____________________________________________________________________________
+9/19/18
+Lecture 3 GPU
+
+Slides Lecture 2
+Memory is slow, GPUs have faster memory interface which means the pipe is wider and the bus is faster
+delays are 1. accessing mem 2. having mem get back to you
+
+Its programmers decision how to divide threads among execution units and what data will be in each one
+if you want to share stuff between execution units, it has to go through the global memory
+if you want stuff shared between orange boxes in an execution unit, it can talk to each other in the local mem (based on GPU parallel processor pic)
+
+1 GPU has lots of execution units inside it
+
+grid is a group of blocks, blocks are a group of threads
+
+SM is a piece of hardware, blocks and threads are a piece of software
+
+SM is, i think, what was previously referred to as execution unit
+
+warps are important because you wont be utilizing execution unit well if you choose to 
+have 33 threads or something. 
+
+host = CPU, device = GPU
+
+bandwidth and memory latency are very....they can be very slow i think, so you have to look out for it
+
+Advice
+1. 32 threads in a warp
+2. if/else loops can be pretty costly
+3. local variables are good
+
+
+3 ways to accelerate applications
+1. libraries w APIs
+2. Compiler Directives, easy to use and if you just want 10x or something
+3. Programming Languages, has most flexibility
+
+you have to take note of which threads may need to cooperate, you should put them in the same block!
+
+
+threads in a block are not globally unique id, threadIdx.x, threadIdx.y, threadIdx.z
+block is assigned to an SM and STAYS WITH THAT SM until the end of execution...so if you meant to have a block in the same SM as another block, you wont be able to change it and they would only be able to communicate via the global memory?
+____________________________________________________________________________
+Lecture 4
+
+Some Restrictions
+	All blocks must have same dimensions otherwise it will complicate the forming of unique ID
+	block must execute in its entirety in assigned SM
+
+Maxwell is more efficient than Kepler, has more cores but does not have double precision floating point. Maxwell is super lightweight cause of this
+
+Synchronization
+	threads in same block can sync
+	sometimes if/else will cause problems
+	threads in diff blocks cant sync, if you gotta sync all threads in all blocks, you should cut your kernel into 2 in that point of your code
+
+Thread Assignment
+	In CPU context switch is a long time, for thread assignment it is 0 but you might lose some parallelism
+
+Whole SM cannot handle more than 1024 number of threads, cannot handle more than 8 number of SPs. WHY?
+	One necessity is high utilization, maximize number of threads per SM
+	increasing or maximizing number of threads will give you higher utilizations
+
+Warps
+	hardware concept invented by nvidia to make it separate from number of SPs
+	4 warp schedulers for current architecture
+	Once block is divided into SM it is divided into 32 threaded warps
+	warp size is implementation specific, 32
+	All threads in a warp much execute 1 instruction before moving to next inst
+
+	Idea:having however many of blocks with size 32 threads(?) then they are automatically synchronized. Is this good idea?
+		no because you need fetch, decode, execute per warp. 
+
+		What if you need to share data among more than 32 warps?
+____________________________________________________________________________
+
+10/3 Lecture 5 
+GPUs
+
+*dont write switch cases in CUDA code! unless in host code
+
+Warps:
+	you never know which warp will finish first
+	unit of thread scheduling INSIDE the SM
+	there is no execution order among warps
+
+Branch Divergence 
+	if/else breaks up threads and you get worse performance
+	if without else
+
+	GPU way better in performance per watt than CPU, but if you dont take advantage of this, youre using a lot of energy but not taking advantage of it
+
+Cannot have more than 8 blocks per SM
+Maximize total number of threads maximizes total number of warps which means you will maximize the number of SP's
+Maximize number of threads, not number of blocks!
+
+The more synchronization or barriers you have in code, the more it will be sensitive to load imbalance.
+
+dont have local non-scalar variables in your code, if you have local vars that arent in registers its gonna be really slow
+
+try to reduce use of nonlocal var
+try not to use if/else
+try to use 32 per block...?
+
+Big global mem decrease in performance
+-communication bt GPU and CPU
+-and communication between GPU and itself
+
+the same element is used many times for matrix multiplication so it benefits from tiling
+you only need one access, every thread is using diff elements, you are not saving any global mem trips for matrix addition
+
+
+increasing utilization of threads is important for increased performance
+
+shared mem goes up, less threads per SM, aka less blocks?
+
+underutilize GPU just by including 1 variable....11 registers vs 10.
+11 decreases all threads in 1 block , you have 1 local var (?) per register
+____________________________________________________________________________
+10/10/11 Lecture 6 
+GPU
+
+shared memory means copied per block
+1000 blocks with 512 threads, local variable in kernel
+	1000 times executed in shared memory
+	152,000 times executed in global memory
+
+Number of threads matters! Not number of blocks...
+
+No pluses of less threads and more kernels
+Minuses are if you have more work per thread, that means you have less resources per block, perhaps less parallelization
+more threads less work means more parallelism but if you want to synchronize between threads
+
+Dynamic shared memory if you dont know size beforehand
+
+____________________________________________________________________________
+Lecture 7 GPU
+
+Floating Point
+
+Denormalized: able to present 0 and very small numbers like 1
+	sign(1 bit) | 	exponent(8 bits)	| 	floating(23 bits)
+   0 = +/1 = - 			2^(1-127) 			the decimals after 1.
+	
+Special values encoding: errors like 0/0 or overflow...exceptions
+FP support in CUDA
+__fadd__ [ra|rb|rc|rd](x,y) (__fmult__, __fdiv__, __fsub__)
+
+kernel does stuff asynchronously, sends it back right away without waiting for others
+streams are like queues in which commands coming back from kernel are put in a default
+if you want to wait for all kernel executions to come back you should sync 
+stream can be a sequence of kernel launches and host-device memory copies, but cannot be anything only for host
+
+to launch a kernel: test<<<blockspergrid, threadsperblock, sharedmemory, stream>>>
+if you pin something, you dont want it to be paged out, then the system performance will greatly suffer cause of thrashing
+
+cudaHostAllocPortable() -> the mem returned by this CUDA call will be considered as pinned memory by all CUDA kernels 
+
+cudaHostAllocMapped() -> only use if you have small amount of data that you want to be used globally?
+
+What is zero-copy? ... Ahhh....its host accessing device, device accessing host without copying anything, pass pointers
+for device to access host is pretty slow
+for big vectors, better to have device pointer for host, pass device pointers to kernel
+
+Tools for CUDA PPT
+nvcc -> ptx intermediate presentation -> binary
+fat binary -> binary of lots of different GPU generations
+-arch stores ptx, -code uses sm_xy so just binary
+to provile the performance of a specific kernel:
+	#include...something
+	cudaProfilerStart() and cudaProfilerStop() above and below specific kernel
+	delete after! cause it makes your code slower
+	fix you nvcc call so that it knows to only print out performance for kernel specified
+Debugging 
+	cudamemcheck executable program, will tell you out of bounds and misaligned memory access errors
+
+____________________________________________________________________________
+Lecture 8 GPU
+
+Memory Alignment = for an element of size K, it must be stored at a memory location multiple of K
+with 2D arrays: sacrificing memory capacity for memory performance
+you can use cudaMallocPitch() so that it aligns everything well
+	this takes array, returns pitch, you input width and height and it finds the best pitch according to your inputs
+pitch is 1 row size
+
+DISADVANTAGE: it adds more complexity, can no longer just access i and j, you have to take pitch into account
+When you SHOULD USE: the bigger the matrix, the better to use
+	the more you use shared mem (higher CGMA), the less important pitch is
+pitch is a good technique to speedup memory access
+
+Multi-GPU System
+Flavors:
+1. only way for GPU to talk to another GPU is through CPU's
+2. 
+
+cudaMemCopy cannot copy to multiple GPUS deviceToDevice only copies within device
+copying global mem from one GPU to global mem of another GPU is inefficient
+
+Dynamic Parallelism: kernel can call another kernel
+ADVANTAGE: host is not involved, and recursion!
+	HOWEVER: thread will never be assumed finished unless all children are done so having threads calling more threads would be really bad, youd have thousands of threads using resources residing on a GPU
+		you can use an if condition, if threadID = 0 then...so that you only do recursion with one thread calling another kernel
+
+Another advantage: problems with various geometries...a thread can call a kernel with a different grid geometry 
+	ie: if looking at a picture, you can have a clearer picture in parts that matter
+
+Comes at the expense of shared mem, global mem, causes huge warp divergence
+You have to use synchronization
+*child grids always finish before parent grids
+____________________________________________________________________________
+
+GPU 11/7/18 Lecture 10
+
+throughput = threads do stuff quickly
+latency = whole program finishes quickly
+occupancy = if you're not using whole resources you're not going to get peak performance, number of threads?
+utilization = different than occupancy....not sure how...using resources well?
+
+if you have more blocks that can be assigned, then occupancy cannot suffer
+latency = time: how long each thing takes
+throughput = rate: how many operations per cycle
+
+we need more threads that can hide more warps that can hide higher latency
+
+with the graph with weird numbers:
+you can hide latency w lots of threads, but there was huge contention from shared memory because high performance...
+if you go to global memory way more than something else it will affect your performance, even if you have more threads
+
+Little's Law:
+needed parallelism = latency x throughput
+
+higher performance doesnt mean you need more threads, but more utilization
+	look at how many SPs you want to use
+	you can increases utilization by increasing throughput and hiding latency
+
+you can use.... cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocks, kernel, blockSize, (dynamic shared mem..)0) to predict your occupancy
+
+gpgpu-sim.org 
+	gives you many statistics about 
+	no dynamic parallelism available though, compile w at most sm=30 Fermi
+
+How to make best use of mem throughput, speed of bus and stuff
+	means minimize data transfer
+
+Privatization is basically mapReduce where each block deals with its own copy and then all combine to create a final copy
+
+Implementation 4
+divide a string and each block gets its copy, then each block has its private histogram/bins
+you then have to reduce all the private histograms into one final copy
+
+Atomic Operations in CUDA: read-modify-write operation on one 32 bit or 64 bit word residing in global or shared memory
+Atomic means its guaranteed to perform without interference from other threads
+	implies serialization, not synchronization
+
+Memory Fence ensures that threads know what was done before and know what was done after, with expense of some slowdown
+
+void __threadfence_block() for whole block (least expensive)
+void __threadfence()/whole device
+void __threadfence_system() for all devices and all systems/whole system  (most expensive)
+
+these dont delay anything, just ensures that everything is read in order. Sync is worse than this, this is called within kernel
+
+Problem Solving:
+you dont want threads doing not much work cause then its a waste of resources or doing too much work cause then youre overloading them too much, need lots of resources
+
+Barnes Hut N-body Problem algorithm to clump close groups and far groups, estimate far groups and exact for close groups
+____________________________________________________________________________
+
+Lecture 10 GPU 11/14/18
+
+Threads, Blocks and Kernels
+
+Number of blocks is equal to number of SMs 
+all kernels use at least as many blocks as there are streaming multiprocessors in the GPU
+
+You can get bandwidth with 384-bit 7 GHz GDDR6
+by 384 * 7 * 2 (2 is for the double in DD)
+
+skim chapters 7/8 because its not gonna be on the test
+
+
+Convolution
+....
+
+trick, launch a redundant kernel before any other kernel launch because apparently it improves time... idk
+
+
+
+

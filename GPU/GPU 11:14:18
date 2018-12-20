@@ -1,0 +1,18 @@
+GPU 11/14/18
+
+Threads, Blocks and Kernels
+
+Number of blocks is equal to number of SMs 
+all kernels use at least as many blocks as there are streaming multiprocessors in the GPU
+
+You can get bandwidth with 384-bit 7 GHz GDDR6
+by 384 * 7 * 2 (2 is for the double in DD)
+
+skim chapters 7/8 because its not gonna be on the test
+
+
+Convolution
+....
+
+trick, launch a redundant kernel before any other kernel launch because apparently it improves time... idk
+

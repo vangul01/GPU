@@ -1,0 +1,91 @@
+Lecture 4 9/26
+GPU 
+
+Intro to CUDA
+
+Vector Addition
+Need 10M for problem to give good performance
+sometimes parallelism is too big to fit to GPU memory
+
+CUDA Mem Model
+	global memory is slowest
+	graphics mem is designed for bandwidth, not for latency
+
+CPU & GPU Memory
+	separate memory, we're losing performance moving stuff back and forth
+	fusion: if CPU and GPU are on the same chip shared memory space L3 cache but sacrificing computational strength for communication, weaker GPU
+
+CUDA device mem allocation
+	malloc allocates object to global mem
+	need address of the pointer ie. cudaMalloc((void**)&Md, size);
+	(malloc and free are APIs, new and delete arent)
+	asynchronous transfer = when you call it you will run it, it will not wait
+
+Vector Addition Example
+	all blocks and threads have same dimensions
+	all blocks must be the same size (32)
+	once block is assigned to 1 SM it will stay with that SM until execution
+	All threads will have unique IDS: int i = threadIdx.x + blockDim.x * 		blockIdx.x;
+
+Programming: Matrix Multiplication
+	NO RECURSION! No static variable declarations, no indirect function calls through pointers
+
+Measures of Success for GPU Code
+1. Compare GPU code to multiprocessor rather than CPU
+2. How scalable is your code? If problem size increases is your code still efficient?
+
+When you want to write GPU code, first write sequential and then bad CUDA and then enhance bad CUDA
+	sequential code will help you see where the bottlenecks are
+
+Assumptions of Matrix Mult Example
+1. assuming every thread will do 1 element of the matrix
+2. assumption that theres only 1 block (only x and y)
+	whats bad about just 1 block? 
+		is that we are losing parallelism 
+		upper bound on GPU of number of threads you can use per block, some problems might not get solved
+
+Dim3 Type
+	x,y,z is way of passing more than 1 dimension
+
+Be Sure to Know:
+	mx dimensions of block
+	mx num threads per block
+	mx dimensions of grid
+	mx number of blocks per GRID*** 
+
+	you can know this by using compute capability: API can give you this
+
+Lecture 4
+
+Some Restrictions
+	All blocks must have same dimensions otherwise it will complicate the forming of unique ID
+	block must execute in its entirety in assigned SM
+
+Maxwell is more efficient than Kepler, has more cores but does not have double precision floating point. Maxwell is super lightweight cause of this
+
+Synchronization
+	threads in same block can sync
+	sometimes if/else will cause problems
+	threads in diff blocks cant sync, if you gotta sync all threads in all blocks, you should cut your kernel into 2 in that point of your code
+
+Thread Assignment
+	In CPU context switch is a long time, for thread assignment it is 0 but you might lose some parallelism
+
+Whole SM cannot handle more than 1024 number of threads, cannot handle more than 8 number of SPs. WHY?
+	One necessity is high utilization, maximize number of threads per SM
+	increasing or maximizing number of threads will give you higher utilizations
+
+Warps
+	hardware concept invented by nvidia to make it separate from number of SPs
+	4 warp schedulers for current architecture
+	Once block is divided into SM it is divided into 32 threaded warps
+	warp size is implementation specific, 32
+	All threads in a warp much execute 1 instruction before moving to next inst
+
+	Idea:having however many of blocks with size 32 threads(?) then they are automatically synchronized. Is this good idea?
+		no because you need fetch, decode, execute per warp. 
+
+		What if you need to share data among more than 32 warps?
+
+
+

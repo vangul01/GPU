@@ -1,0 +1,44 @@
+
+9/19/18
+Lecture 3 GPU
+
+Slides Lecture 2
+Memory is slow, GPUs have faster memory interface which means the pipe is wider and the bus is faster
+delays are 1. accessing mem 2. having mem get back to you
+
+Its programmers decision how to divide threads among execution units and what data will be in each one
+if you want to share stuff between execution units, it has to go through the global memory
+if you want stuff shared between orange boxes in an execution unit, it can talk to each other in the local mem (based on GPU parallel processor pic)
+
+1 GPU has lots of execution units inside it
+
+grid is a group of blocks, blocks are a group of threads
+
+SM is a piece of hardware, blocks and threads are a piece of software
+
+SM is, i think, what was previously referred to as execution unit
+
+warps are important because you wont be utilizing execution unit well if you choose to 
+have 33 threads or something. 
+
+host = CPU, device = GPU
+
+bandwidth and memory latency are very....they can be very slow i think, so you have to look out for it
+
+Advice
+1. 32 threads in a warp
+2. if/else loops can be pretty costly
+3. 
+
+
+3 ways to accelerate applications
+1. libraries w APIs
+2. Compiler Directives, easy to use and if you just want 10x or something
+3. Programming Languages, has most flexibility
+
+you have to take note of which threads may need to cooperate, you should put them in the same block!
+
+
+threads in a block are not globally unique id, threadIdx.x, threadIdx.y, threadIdx.z
+block is assigned to an SM and STAYS WITH THAT SM until the end of execution...so if you meant to have a block in the same SM as another block, you wont be able to change it and they would only be able to communicate via the global memory?
+

@@ -1,0 +1,41 @@
+Lecture 7 GPU
+
+Floating Point
+
+Denormalized: able to present 0 and very small numbers like 1
+	sign(1 bit) | 	exponent(8 bits)	| 	floating(23 bits)
+   0 = +/1 = - 			2^(1-127) 			the decimals after 1.
+	
+Special values encoding: errors like 0/0 or overflow...exceptions
+FP support in CUDA
+__fadd__ [ra|rb|rc|rd](x,y) (__fmult__, __fdiv__, __fsub__)
+
+kernel does stuff asynchronously, sends it back right away without waiting for others
+streams are like queues in which commands coming back from kernel are put in a default
+if you want to wait for all kernel executions to come back you should sync 
+stream can be a sequence of kernel launches and host-device memory copies, but cannot be anything only for host
+
+to launch a kernel: test<<<blockspergrid, threadsperblock, sharedmemory, stream>>>
+if you pin something, you dont want it to be paged out, then the system performance will greatly suffer cause of thrashing
+
+cudaHostAllocPortable() -> the mem returned by this CUDA call will be considered as pinned memory by all CUDA kernels 
+
+cudaHostAllocMapped() -> only use if you have small amount of data that you want to be used globally?
+
+What is zero-copy? ... Ahhh....its host accessing device, device accessing host without copying anything, pass pointers
+for device to access host is pretty slow
+for big vectors, better to have device pointer for host, pass device pointers to kernel
+
+Tools for CUDA PPT
+nvcc -> ptx intermediate presentation -> binary
+fat binary -> binary of lots of different GPU generations
+-arch stores ptx, -code uses sm_xy so just binary
+to provile the performance of a specific kernel:
+	#include...something
+	cudaProfilerStart() and cudaProfilerStop() above and below specific kernel
+	delete after! cause it makes your code slower
+	fix you nvcc call so that it knows to only print out performance for kernel specified
+Debugging 
+	cudamemcheck executable program, will tell you out of bounds and misaligned memory access errors
+
+

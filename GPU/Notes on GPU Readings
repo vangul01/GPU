@@ -1,0 +1,673 @@
+Similar themes in tests:
+
+spring 12
+pitch
+more blocks less threads OR less blocks more threads
+In one hand, more threads per block means more warps. This means more opportunities for coalescing and hence potential reduction in bandwidth. On the other hand, more blocks means they will be spread over several SMs and hence will have access to more L1 caches, which can positively reduce L2 access and hence bandwidth requirement.
+
+spring 13
+warps
+pros/cons bt diff threads/blocks combos 
+execution time based on threads per block
+code performance and speed-up enhancements
+branch divergence
+
+fall 14
+block resources
+correct code, thread divergence
+differences in GPU models and code
+streams and kernel launch
+design choices
+tiling
+mem hierarchy of GPU
+Q: 7???
+
+fall 15
+streams (copy mem host-> device, kernel launch, copy mem device -> host)
+branch divergence
+OpenCL and task queues
+streams usefulness
+CPU vs GPU
+warps
+memory coalescing
+L2 cache
+
+fall 16
+GPU vs CPU
+coalesced memory
+global mem access
+indexes of threads
+warps
+how many __ will be generated?
+block dimension questions
+CGMA = floatingPt ops/mem accesses
+synchronization
+OpenCL
+Q: 2???
+
+fall 2017
+streams
+performance of kernel
+tiling
+number of warps diverging
+local memory
+constant vs global vs local mem
+kernel sizes
+Q: 3,8 ???
+
+
+branch divergence:
+If there is branch divergence then the code will run more slowly than code always performing the square root since within a warp the execution time will be the sum of both paths through the if.
+
+if without else leads to performance loss??
+Yes, it can lead to some performance loss if some threads in the warp have a true condition and others do not. In that case, those who have false, must wait till the others finish the if- part, leading to performance loss. However, it is not as severe as the if-else.
+
+if else with syncthreads in both branches
+May result in deadlock if some threads in the warp go to the if-part and others in the else-part.
+Move _syncthreads() outside the if-else part.
+
+warps:
+memory coalescing = potential reduction in bandwidth
+parallelism
+more threads in a block = more warps
+[Advantage]
+o Amortize the hardware cost of instruction fetch and decode phases. 
+o Simplifies the scheduling
+[Disadvantage]
+o Lockstep execution can cause branch divergence 
+o Introduces some restrictions on block sizes.
+
+L2
+whats an L2 miss?
+In an L2 miss, a cache block is fetched from the global memory. A cache block is coalesced as it consists of continuous bytes from memory.
+
+tiling
+• To allow more the usage of shared memory to reduce global memory access.
+• To allow dealing with very large matrices that cannot fit in global memory.
+
+synchronization
+CUDA does not allow synchronization among threads in different blocks.
+
+constant memory
+read only and small size data
+
+rows vs columns
+to find row = blockID.y * blockDim.y + threadID.y
+to find col = blockID.x * blockDim.x + threadID.x
+
+
+___________________________________________
+Notes on GPU Lectures:
+___________________________________________
+
+Lecture 1 Gentle Intro to GPUS
+	-Best applications for GPU = computation intensive, many independent computations, many similar computations
+	-SPs within SM share control logic and instruction cache
+	-Modern GPU(SP) = 
+		• Much higher bandwidth than typical system memory 
+		• A bit slower than typical system memory
+		• Communication between GPU memory and system memory is slow
+	-GPU is for throughput, CPU is for latency
+_____________________________________________
+Lecture 2 Hardware Perspective of GPUs
+	-GPU is Single Instruction Multiple Data architecture (SIMD)
+	-SPs/cores/CUDA cores = parallel execution units
+	-Software = application, kernel, thread, block, grid
+	-threads of same block run on same SM --> threads in SM share mem
+	-block is divided into warps of 32 threads
+	-blocks in grid coordinate with global mem
+	-each grid executes a kernel
+	scheduling: distributed thread scheduler
+		– At the device level: a global work distribution engine schedules thread blocks to various SMs
+		– At the SM level, each warp scheduler distributes warps of 32 threads to its execution units.
+	Memory Hierarchy
+		-Local memory in each SM
+		- The ability to use some of this local memory as a first-level (L1) cache for global memory references.
+		-The local memory is 64K in size, and can be split 16K/48K or 48K/16K between L1 cache and shared memory.
+		-The L2 cache covers GPU local DRAM as well as system memory.
+		-The L2 cache subsystem also implements a set of memory read- modify-write operations that are atomic
+_____________________________________________
+Lecture 3 Intro to CUDA
+	Blocks: threads within block cooperate through shared mem, atomic operations, barrier synchronization 
+		-each block is assigned to an SM
+	Global memory
+		– Main means of communicating R/W Data between host and device
+		– Contents visible to all threads
+		– Long latency access
+	myKernel<<<ceil(n/threadsPerBlock), threadsPerBlock>>>
+	blockDim.x <------>
+	blockDim.y up/down
+	tons of grid/block/thread ID examples here
+_____________________________________________
+Lecture 4: CUDA Threads and Mems
+	software ----> blocks, kernels, threads, grids
+	hardware ----> SM, SP, Warps
+	
+	-All threads in a grid execute same kernel function
+	-Once block is assigned to SM, it must execute in entirety by SM
+	-threads in different blocks cannot sync
+	-transparent scalability = The ability to execute the same application code on hardware with different number of execution resources
+	SM resources = 
+		computational units, # threads that can be simultaneously tracked and scheduled, registers, shared mem
+	Warps
+		-once block is assigned to SM it is divided into warps
+		-threadIDs within warp are consecutive and increasing
+		-warps = unit of thread scheduling in SMs
+		-RANDOM ORDERING! cant tell which one will finish first
+	Branch Divergence
+		-happens when threads inside warps branches to diff execution paths 50% performance loss
+		-AVOID when branch condition is a function of thread ID
+			divergence = If (threadIdx.x > 2) { }
+			no divergence = If (threadIdx.x / WARP_SIZE > 2) { }
+	
+	Latency Tolerance: scheduling used for tolerating long-latency operations such as pipelined floating-point arithmetic, branch instructions 
+		Latency Hiding = When an instruction executed by the threads in a warp must wait for the result of a previously initiated long-latency operation, the warp is not selected for execution
+		Zero-overhead thread scheduling = scheduling doesn't introduce idle time
+	CGMA: computer to global mem access ration
+		fp calculations/ global mem accesses
+		higher CGMA, higher performance
+	Registers
+		for each thread
+		fastest!
+		dont consume off-chip bandwidth
+		accessible only by thread and is lifetime of a thread
+		access involves fewer instructions than global mem
+		aggregate registers files bandwidth way lower than global mem
+		energy consumed for accessing value from reg file = way lower than accessing global mem!
+		the more mem locations each thread requires, the fewer the number of registers per SM
+
+	Local Memory
+		local for each thread
+		used for:
+			arrays not accessed by constant indices
+			large structs and arrays that dont fit into registers
+			register spilling into local mem if thread uses lots of registers
+			does not physically exist, abstraction to local scope of thread
+				actually put in global mem by compiler
+	Shared Memory
+		extremely fast!
+		highly parallel
+		for each block, all threads in a block share it
+		part of address space, accessing requires load/store instructions
+		limited shared mem limits # of threads that can execute simultaneously in SM for given application
+			the more mem locations each thread requires, the fewer the number of threads per SM
+	Global Memory
+		implemented in DRAM
+		high access latency
+		finite access bandwidth
+		potential of traffic congestion
+		all threads from all blocks have access to it
+		located in grid
+		global mem access is performance bottleneck
+		lower CGMA, lower performance
+	Constant Memory
+		read only
+		short latency and high bandwidth when all threads access same location
+	Scopes:
+		local variable --> mem: register, scope: thread, lifetime: thread
+		shared variable --> mem: shared, scope: block, lifetime: block
+		global variable --> mem: global, scope: grid, lifetime: application
+		constant variable --> mem: constant, scope: grid, lifetime: application
+	Tiling : partition data into subsets called tiles such that each tile fits into shared mem
+		identify tile of global mem thats accessed by multiple threads
+		load tile from global mem into on-chip mem(shared mem)
+		use barrier synch to make sure all threads ready to start phase
+		*Potential reduction in global mem in matrix mult is proportional to dimension of blocks used
+	_synch
+		The only safe way to synchronize threads in different blocks is to terminate the kernel and start a new kernel for the activities after the synchronization point
+_____________________________________________
+Lecture 5: CUDA Advanced Techniques 1
+	Performance Issues!
+		Thread/Branch Divergence
+		Global Memory
+			main challenges = long latency, relatively limited bandwidth
+			TILING = use shared mem to reduce trips to global mem!
+			COALESCING = move data from global mem to shared and registers
+			the more scattered the addresses, the more reduced the throughput
+				make use of data from multiple consecutive locations so DRAM supplys data in much higher rate
+
+				More coalesces->less mem transactions->higher throughput->better performance
+				less global mem instructions -> more opportunities to coalesce
+			PREFETCHING = prefetch next data elements while consuming current data elements
+		SM Resources
+			execution resources are: registers, block slots, shared mem, thread slots
+			EXAMPLE w how many registers threads need
+					instruction cycle and global mem latency
+		Instruction Mix
+			LOOP UNROLLING	= write out what would happen from loop
+				Pvalue += Ms[ty][0] * Ns[0][tx] + ... Ms[ty][15] * Ns[15][tx];
+								versus
+				for (int k = 0; k < BLOCK_SIZE; ++k)
+    				Pvalue += Ms[ty][k] * Ns[k][tx];
+    	Thread Granularity
+    		put more work into each thread and use fewer threads
+    		less redundant 
+    		maybe more independent instructions
+    		negative = more resources requirements
+    	
+    	Considerations:
+    	• When designing an algorithm for GPU, the two main characteristics that determine its performance are:
+			1. How much parallelism is available
+			2. How much data must move through the memory hierarchy
+
+		Dynamic Shared Memory:
+			DynamicShared<<<100, 100, N*sizeof(int)>>>(int *, int);
+			Potential Performance Loss: Shared Mem Bank Conflicts
+				shared mem is divided into equally sized mem modules called banks
+				banks accessed simultaneously
+
+		**** Floating point representations examples ****
+
+		Asynchronous Execution
+			returns to host right away and doesnt wait for device
+				ex: kernel launches, mem copy bt 2 addresses to same device mem
+		STREAMS
+			•A sequence of operations that execute on the device in the order in which they are issued by the host code
+			• Operations in different streams can be interleaved and, when possible, they can even run concurrently.
+			• A stream can be sequence of kernel launches and host-device memory copies
+			• Can have several open streams to the same device at once
+			PERFORMANCE IMPROVEMENT? can overlap transfer and computation
+				EX: default stream is cudaMemCopyHostToDevice, cudaMemCopyDeviceToHost
+				data transfers are synchronous, kernel launch is asynchronous
+			The amount of overlap bt streams depends on
+				-device supports overlap transfer and kernel execution
+				-Devices supports concurrent kernel execution
+				-Device supports concurrent data transfer
+				-The order on which commands are issued to each stream
+			Streams are a good way to overlap execution and transfer, hardware permits.
+		PINNED PAGES
+			-allocate pages from system RAM, accessible by device, enables highest mem copy performance
+			-if too many pinned pages, systems performance tanks
+			-Accessing host memory from device without explicit copy is called zero-copy mechanism.
+			ZERO-COPY MECHANISM
+				copying from hos to device without cudamemcopy
+					use cudaHostAlloc
+					use pointer from kernel on device
+			**If the CPU program requires a lot of memory, then pinned pages is not a good idea.
+	FINAL THOUGHTS
+	• As we program GPUs we need to pay attention to several performance bottlenecks:
+		– Branch diversion
+		– Global memory latency
+		– Global memory bandwidth
+		– Shared memory bank conflicts
+		– Communication
+		– Limited resources
+	• We have several techniques in our arsenal to enhance performance
+		– Try to make threads in the same warp follow the same control flow
+		– Tiling
+		– Coalescing
+		– Loop unrolling
+		– Increase thread granularity
+		– Trade one resource for another
+		– Memory access pattern
+		– Streams
+_____________________________________________
+LECTURE 6: Advanced CUDA techniques 2
+
+	Alignment
+		mem access is better if datas aligned, 64 or 128 row start values
+
+		PITCH
+			add padding to make alignment better
+			Pitch is a good technique to speedup memory access
+			DRAWBACKS:
+				• Some wasted space
+				• A bit more complicated elements access
+
+	Multi-GPUs
+		scale up performance, another level of parallelism, power, reliability
+	Evolution of CPU-GPU
+		Unified Virtual Address
+			puts all CUDA execution, host and GPUs, in the same address space
+			UVA ZERO-COPY
+				single virtual mem address space and enables pointers to be accessed from GPU code no matter where they reside
+			UVA MEM COPY
+				doesnt move data automatically bt CPU and GPU
+			UNIFIED MEM
+				depends on UVA
+				Creates a pool of managed memory that is shared between the CPU and GPU.
+				Managed memory is accessible to CPU and GPU with single pointers.
+				moves data automatically between CPU and GPU
+				higher performance than UVA
+				
+				ADVANTAGES
+					ease of programming
+					data migrated on demand
+					very efficient with complex data structures (LL, structs w pointers)
+				DISADVANTAGES
+					Carefully tuned CUDA program that uses streams to efficiently overlap execution with data transfers may perform better than a CUDA program that only uses Unified Memory.
+	Dynamic Parallelism = recursion!!!
+		GPU can generate work on itself without involvement of CPU
+			• Kernels can start new kernels
+			• Streams can spawn new streams.
+		This is useful for nested for-loops and kernels of different dimensions
+		device kernel launch is asynchronous, like in host
+		successful kernel launch means its queued
+		make sure only one thread launches the kernel!!!!
+	
+	Conclusions: There are many performance enhancement techniques in our arsenal:
+		– Alignment
+		– Streams
+		– Asynchronous execution – Dynamic Parallelism
+		– Multi-GPU
+_____________________________________________
+Lecture 7: CUDA Advanced Techniques 3
+	Error handling
+	Performance = throughput, latency, occupancy, utilization
+		more threads is not always better!!!
+		LATENCY = TIME = how much time something takes	
+			ie: instructions take 4 cycles per warp, mem takes 400 cycles
+		THROUGHPUT = RATE = how many operations per cycle/second 
+			increase through instruction level parallelism, thread level parallelism
+		To hide latency, you do other stuff while waiting
+		Higher performance = higher utilization
+		UTILIZATION = related to parallelism
+			increase utilization by increasing throughput and decreasing latency
+		OCCUPANCY = based on block size, shared mem usage of a kernel
+			reported through number of concurrent thread blocks per SM
+
+		For mem:
+		maximizing overall memory throughput for the application = minimize data transfers with low bandwidth (host <-> device, global mem access)
+			do this by...
+			1.loading data from device mem to shared mem
+			2. sync w threads of block so each thread accurately reads whats in shared mem
+			3. process data in shared mem
+			4. sync again if needed to update shared mem
+			5. write results back to device mem
+
+	HISTOGRAM EXAMPLE
+	*** slide 30: Implementation of bins and letters example***
+ 			issues are collisions, non-consecutive accesses
+ 			
+ 	Atomic Operations
+ 		needed for read-modify-write
+ 		used to avoid collisions
+ 		hardware ensures no other threads can perform another read-write-modify until current atomic operation is complete
+ 		all threads perform atomic operations serially
+ 			pros: no data race, coalesced mem access
+ 			cons: performance loss due to serialization
+ 	Privatization: creates and initializes private copies
+ 		pros: less contention and serialization, improved performance
+ 		cons: overhead for making individual copies and for accumulating contents of private copies into 1 final copy
+
+ 	What we learned from the histogram example
+		• Atomic operations may be needed → sacrificing some performance for correctness
+		• Privatization can sometimes reduce the performance loss due to serialization caused by atomic operations.		
+
+	Memory Fencing
+
+	the order in which CUDA thread writes data to shared, global, page-locked host or peer-device mem is not necessarily in the order that another thread would do
+		strongly-ordered memory model
+		weakly-ordered memory model
+
+	N-body Problem example (slide 76) 
+_____________________________________________
+Lecture 8: Parallel Patterns
+	Convolution
+	Constant Memory
+		constant mem variables are visible to all thread blocks
+		vars cannot be changed during kernel execution
+		size of constant mem can vary from devices
+	Reduction Trees
+		parallel computation pattern
+		strategy to process large input data sets
+			partition data set into smaller chunks
+			each thread processes a chunk
+			use reduction tree to summarize results from each chunk into final answer
+		ie: Google and Hadoop MapReduce
+		helps clean up privatization
+
+		Performance factors of reduction kernel
+			memory coalescing
+			control divergence
+			thread utilization
+
+	Barrier Synchronization
+		_synchthreads() is needed to ensure all elements of each version of partial sums have been generated before we proceed to next step
+
+	Good strategy:
+		compact partial sums into first locations of array
+		keep active threads consecutive
+
+	**** examples with stride and reduction kernel, coalescing (slide 35)
+
+	Parallel Scan: used for parallel work assignment and resource allocation
+		converts serial computation into parallel computation
+		applications: assigning camp slots, assigning farmers market spaces, radix sort, quicksort
+
+	***very long example of scan**
+	Conclusion:
+	We have reviewed several useful parallel patterns that you can use in your own GPU programming:
+		– Convolution and tiled convolution
+		– Reduction trees
+		– Prefix scan (inclusive and exclusive)
+	• Parallel version must be work efficient
+	• Then we apply different GPU optimizations from our bag of tricks (coalescing, shared memory usage, ...).
+_____________________________________________
+Lecture 9: OpenACC
+
+	insert hints on how program should be parallelized
+		#pragma is for hints
+	17: specify number gangs and number workers in each gang
+		num workers determined by compiler/runtime
+	multiple levels of parallelism: gang, worker, vector
+	EX: 27: #pragma acc kernels vs #pragma acc parallel loop
+		make sure no data dependencies!!
+		things execute asynchronously
+	Conclusions
+		• OpenACC is easy to learn and gets you to a fast start to use an accelerators.
+		• Directives on top of C, C++, and Fortran
+		• Compared with CUDA, OpenACC gives you less control of how the final code on the accelerator will be.
+		• OpenACC can be used fairly fine with CUDA and its libraries.
+_____________________________________________
+Lecture 10: OpenCL
+
+	OpenCL draws heavily on CUDA
+		– Easy to learn for CUDA programmers
+	OpenCL host code is much more complex and tedious due to desire to maximize portability and to minimize burden on vendors
+
+	OpenCL runs on host which submits work to compute devices
+
+	OpenCL
+	• kernel
+	• Host program 
+	• NDRange
+	• work item
+	• work group
+
+	CUDA
+	• kernel
+	• Host program 
+	• Grid
+	• Thread
+	• Block
+
+	Memory management is explicit
+		– Must move data from host memory to device global memory, from global memory to local memory, and back
+	Work-groups are assigned to execute on compute-units
+		– No guaranteed coherency among different work-groups
+
+	MEMORIES
+	• __global – large, long latency
+	• __private – on-chip device registers
+	• __local – memory accessible from multiple PEs or work items. May be SRAM or DRAM.
+	• __constant – read-only constant cache
+	• Device memory is managed explicitly by the programmer, as with CUDA
+
+	Mapping dimensions OpenCL vs CUDA
+	• get_global_id(0)			vs  blockIdx.x*blockDim .x+threadIdx.x
+	• get_local_id(0)			vs  threadIdx.x
+	• get_global_size(0) 		vs  gridDim.x*blockDim.x
+	• get_local_size(0)			vs  blockDim.x
+
+	host code for OpenCL is a bitch though
+	context = A context refers to the environment for managing OpenCL objects and resources
+		– Devices: the things doing the execution
+		– Program objects: the program source that implements the kernels
+		– Kernels: functions that run on OpenCL devices
+		– Memory objects: data that are operated on by the device
+		– Command queues: mechanisms for interaction with the devices
+
+	Transferring Data
+		– Copying from the host to a device is considered writing
+		– Copying from a device to the host is reading
+
+	Compilation Model
+		• More complicated than CUDA
+		• uses Dynamic/Runtime compilation model
+
+	You also have to write the kernel in a separate file and then it gets compilied in a jit fashion....just in time
+	the kernel is a string and is taken in by the host and compiled in this way
+
+
+	EX slides ~50-61 Steps on how to do data parallel OpenCL stuff
+	also examples for task parallelism 
+
+	pipes too..
+	New memory object: pipes
+		– Ordered sequence of data items called packets
+		– Stored on the basis of a first in, first out method
+		– Can only be accessed via intrinsics read_pipe() and write_pipe()
+
+	***example: image clustering slide 71***
+
+
+	Local Memory
+	(From OpenCL Perspective)
+		• Local memory is a high bandwidth low- latency memory used for sharing data among work-items within a work-group.
+		• However:
+			– local memory has limited size
+			– on AMDRadeon HD 7970 GPU there is 64 KB of local memory per compute unit, with the maximum allocation for a single work- group limited to 32 KB.
+
+	Constant Memory
+		• Constant memory is a memory space to hold data that is accessed simultaneously by all work-items
+			– Usually maps to specialized caching hardware that has a fixed size
+		• Advantages for AMD hardware
+			– If all work-items access the same address, then only one access request will be generated per wavefront – Constant memory can reduce pressure from L1 cache – Constant memory has lower latency than L1 cache
+
+	Conclusions: 
+		• OpenCL has high portability to many accelerators
+		• CUDA has been around for longer -> more libraries and OpenCL is playing catch-up
+
+___________________________________________
+Notes on GPU Homeworks:
+___________________________________________
+
+RANDOM
+	...what are fat binaries?? Something to do with jit...
+
+VIDEOS
+GPGPU
+CPU optimized for minimal latency switch quickly bt diff opps
+GPU optimized for throughput be able to push as many operations through device as possible
+
+ALU = arithmetic logic ops
+
+L2 cache is smaller in GPU cause it doesnt matter how long to get info from DRAM, just as long as theres sufficient work to hide latency. Global mem or complex operations give high latency
+
+GPU hides latency with computations from other thread warps
+
+SM performs the actual computations, each has its own caches, pipelines, registers, control units
+_______________
+HW1
+_______________
+
+SM = the more you have, the higher computing performance, increased parallelism
+	all SM's share a L2 cache
+SP/CUDA cores = these have resources for computing, the more you have means you have more resources for parallelism
+	all SP's share L1 cache and shared mem
+bandwidth = provides data supply to threads
+
+GPU needs memory for bandwidth
+CPU needs memory for latency
+
+_______________
+HW2:
+_______________
+
+myKernel<<<blocksPerGrid, threadsPerBlock>>>
+
+Global memory loads: when you take variable passed into the kernel and USE it somehow, and you need the value to be loaded in
+
+Global memory stores: when you save a certain value into one of the variables that was passed into the kernel
+
+Shared memory writes: writing value to a variable created in kernel
+
+Shared memory reads: reading value of variable created in kernel
+
+Branch divergence: occurs when threads are separated in groups that aren't a multiple of warp size(32), if they are contiguous.
+
+blocks and SM's: block(s) reside on an SM, but block isn't part of the hardware, its just a means to conceptualize stuff...how many reside on an SM??
+An SM can run a number of blocks at the same time. The number of blocks depends on how many resources each block requires and how many resources the SM has.
+
+blocks and threads are the amount of work that needs to be done and SM and SP are the resources used to perform this work
+
+Execution time: With x blocks of y threads, the execution time would be t/x*y
+
+___________________________________________
+Notes on GPU Readings:
+___________________________________________
+
+_______________
+Chapter 5
+_______________
+
+5.1 Importance of Mem Access Efficiency
+-global mem has long access latencies and finite access bandwidth
+-Compute to Global Memory Access(CGMA) ratio = ratio of floating point calculation to the global mem access operation so #calcs: #accesses to automatic array variables (kernel param arrays w host data)
+-highest rate of floating pt calc throughput depends on rate at which input data can be loaded from global mem
+-increase CGMA ratio for higher level of performance from kernel!!
+
+5.2 CUDA Device Mem Types
+-constant mem: supports short-latency, high-bandwidth, read-only access by device 
+-registers and shared mem are on-chip mems, can be accessed at very high speeds in highly parallel manner
+-threads get their own registers, can only access own
+-shared mem: allocated to thread blocks, all threads in a block can access
+-automatic array variables (arrays in params of kernel) incure long access delays and potential access congestions since theyre in global mem
+-constant vars: stored in global but cached for fast access, accessible to all grids, lifetime is entire application execution
+-no way to sync threads from different thread blocks
+
+5.3 Reducing Global mem traffic
+-global mem = large but slow
+-shared mem = small but fast
+-tiles = data partitioned into subsets where each tile fits into shared mem
+***********
+-Im confused about pages 104/105....dealing with threads computations
+***********
+-potential reduction of global mem accesses for matrix mult can be 1/N
+
+105 Md is accessed from global mem, all parameters brought in to kernel are from global mem
+
+threads can collaborate to reduce traffic to global mem by loading Md and Nd into shared mem before each thread grabs its part to do dot product
+	SHARED MEM IS SMALL THOUGH!
+	Divide Md and Nd into smaller tiles!
+
+...got to pg 106 ch 5
+
+Locality and shared memory and tiling:
+Such focused access behavior is called locality. When an algorithm exhibits locality, there is an opportunity to use small, high-speed memories to serve most of the accesses and remove these accesses from the global memory. 
+
+pg 109
+automatic scalar variables (such as threadIDx.x and BlockID.x):
+automatic scalar variables are placed into registers. Their scope is in each individual thread. That is, one private version of tx, ty, bx, and by is created by the runtime system for each thread. They will reside in registers that are accessible by one thread. They are initialized with the threadIdx and blockIdx values and used many times during the lifetime of thread. Once the thread ends, the values of these variables also cease to exist.
+
+5.4 Mem as a limiting factor to Parallelism
+In general, the more memory locations each thread requires, the fewer the number of threads that can reside in each SM and thus the fewer number of threads that can reside in the entire processor.
+
+Shared memory usage can also limit the number of threads assigned to each SM.
+
+6.1 More on Thread Execution
+
+The hardware executes an instruction for all threads in the same warp, before moving to the next instruction. This style of execution, called sin- gle-instruction, multiple-thread (SIMT)
+
+In our if–then–else example, when some threads execute the then part and others execute the else part, the SIMT execution style no longer works well. In such situations, the execu- tion of the warp will require multiple passes through these divergent paths. One pass will be needed for those threads that follow the then part and another pass for those that follow the else part. These passes are sequential to each other, thus adding to the execution time.
+
+stride >>= 1 means dividing the stride by 2 for each loop execution
+
+***If all of the threads in each warp take the same path, there is no thread divergence!
+
+6.2 Global Mem bandwidth
+
+the most favorable access pattern is achieved when the same instruction for all threads in a warp accesses consecutive global memory locations. In this case, the hardware combines, or coalesces, all of these accesses into a con- solidated access to consecutive DRAM locations.
+
+

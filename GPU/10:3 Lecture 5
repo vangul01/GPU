@@ -1,0 +1,45 @@
+10/3 Lecture 5 
+GPUs
+
+*dont write switch cases in CUDA code! unless in host code
+
+Warps:
+	you never know which warp will finish first
+	unit of thread scheduling INSIDE the SM
+	there is no execution order among warps
+
+Branch Divergence 
+	if/else breaks up threads and you get worse performance
+	if without else
+
+	GPU way better in performance per watt than CPU, but if you dont take advantage of this, youre using a lot of energy but not taking advantage of it
+
+Cannot have more than 8 blocks per SM
+Maximize total number of threads maximizes total number of warps which means you will maximize the number of SP's
+Maximize number of threads, not number of blocks!
+
+The more synchronization or barriers you have in code, the more it will be sensitive to load imbalance.
+
+dont have local non-scalar variables in your code, if you have local vars that arent in registers its gonna be really slow
+
+try to reduce use of nonlocal var
+try not to use if/else
+try to use 32 per block...?
+
+Big global mem decrease in performance
+-communication bt GPU and CPU
+-and communication between GPU and itself
+
+the same element is used many times for matrix multiplication so it benefits from tiling
+you only need one access, every thread is using diff elements, you are not saving any global mem trips for matrix addition
+
+
+increasing utilization of threads is important for increased performance
+
+shared mem goes up, less threads per SM, aka less blocks?
+
+underutilize GPU just by including 1 variable....11 registers vs 10.
+11 decreases all threads in 1 block , you have 1 local var (?) per register
+
+
+

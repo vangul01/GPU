@@ -1,0 +1,55 @@
+GPU 11/7/18 Lecture 10
+
+throughput = threads do stuff quickly
+latency = whole program finishes quickly
+occupancy = if you're not using whole resources you're not going to get peak performance, number of threads?
+utilization = different than occupancy....not sure how...using resources well?
+
+if you have more blocks that can be assigned, then occupancy cannot suffer
+latency = time: how long each thing takes
+throughput = rate: how many operations per cycle
+
+we need more threads that can hide more warps that can hide higher latency
+
+with the graph with weird numbers:
+you can hide latency w lots of threads, but there was huge contention from shared memory because high performance...
+if you go to global memory way more than something else it will affect your performance, even if you have more threads
+
+Little's Law:
+needed parallelism = latency x throughput
+
+higher performance doesnt mean you need more threads, but more utilization
+	look at how many SPs you want to use
+	you can increases utilization by increasing throughput and hiding latency
+
+you can use.... cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocks, kernel, blockSize, (dynamic shared mem..)0) to predict your occupancy
+
+gpgpu-sim.org 
+	gives you many statistics about 
+	no dynamic parallelism available though, compile w at most sm=30 Fermi
+
+How to make best use of mem throughput, speed of bus and stuff
+	means minimize data transfer
+
+Privatization is basically mapReduce where each block deals with its own copy and then all combine to create a final copy
+
+Implementation 4
+divide a string and each block gets its copy, then each block has its private histogram/bins
+you then have to reduce all the private histograms into one final copy
+
+Atomic Operations in CUDA: read-modify-write operation on one 32 bit or 64 bit word residing in global or shared memory
+Atomic means its guaranteed to perform without interference from other threads
+	implies serialization, not synchronization
+
+Memory Fence ensures that threads know what was done before and now what was done after, with expense of some slowdown
+
+void __threadfence_block() for whole block (least expensive)
+void __threadfence()/whole device
+void __threadfence_system() for all devices and all systems/whole system  (most expensive)
+
+these dont delay anything, just ensures that everything is read in order. Sync is worse than this, this is called within kernel
+
+Problem Splving:
+you dont want threads doing not much work cause then its a waste of resources or doing too much work cause then youre overloading them too much, need lots of resources
+
+Barnes Hut N-body Problem algorithm to clump close groups and far groups, estimate far groups and exact for close groups

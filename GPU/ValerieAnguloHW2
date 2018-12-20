@@ -1,0 +1,63 @@
+Valerie Angulo
+GPU HW2
+
+
+
+1A. Total threads = 256*1024 = 262,144
+
+1B. 32 threads in a warp
+
+1C. 256 threads in a block 
+
+1D. 2 global memory loads (lines 17-18) and 1 global memory store (line 30) for each thread.
+
+1E. 2 accesses to shared memory are done for each block (lines 21 and 27)
+
+1F. 
+for (int stride = 128; stride > 0; stride >>=1)
+	if (tx < stride) causes branch divergence
+
+During the first iteration of the for loop, only the threads with threadIdx.x values that are less than 256/2 will execute the add statement, so half of the iterations will have branch divergence. Each iteration would have a few less values that execute line 27 until there are no more threadIdx.x values that fit the criteria for being less than the stride. 
+
+1G. To reduce the bandwidth requirement on the global memory, I could coalesce the memory in line 21 from the matrix multiplication using the row major convention. From this, I can eliminate 1/ELEMENT_N accesses.
+
+
+2. Three factors that would make threads from 2 different warps but of the same block take different amounts of time to finish would be...
+
+1. thread divergence
+2. SM executing warps in lockstep
+3. warp scheduler replacing warp that stalled with another warp thats ready
+
+
+3. The difference between shared memory and L1 cache is that the contents of shared memory are managed by the programmers code while the L1 cache is automatically managed.
+
+
+4. Yes, memory can be coalesced for threads in a warp and not coalesced for threads in a different warp of the same block because threads within a warp execute the same instruction. For example, the threads in a warp could be executing a load instruction and accessing consecutive global memory locations, while different warps in the same block may be executing different instructions that aren't accessing consecutive global memory locations. 
+
+
+5. My dimensions would be:
+Block dim = 32 x 32 
+Grid dim = 13 x 29
+
+total number of threads >= 400*900 = 360,000 
+My block dimensions would be 32 x 32 because that equals 1024 threads which is the maximum threads per block. My grid dimensions would be (int)(400/32)+1 x (int)(900/32)+1 = 13x29 in order to have enough threads to fit the image. These grid dimensions give me a total of 386,048 threads. There are more threads than pixels, so I would have to perform a bounds check inside the kernel to only process the threads that fall inside the image bounds. 
+
+
+6A. Using one block of 16 threads takes t/16 amount of time. 
+
+6B. Using two blocks of 8 threads each takes t/16 amount of time. 
+
+6C. The answers are the same because the total number of threads is 16 for both and both cases would be able to utilize 16 SP's out of the 32 SP's per SM, which means that all the threads could execute at the same time and thus take an equal portion of time. 
+
+6D. It would take time = t/256 because the number of threads being 256 versus 1024 doesn't affect the performance, its the number of warps that matters.
+
+6E. It would take time = t/512 because of the 512 threads per block.
+
+
+7. It makes sense if there is no branch divergence to perform the code below. If there is branch divergence it doesn't make sense because the branch divergence would make the code run slower than if the square root was just performed on all cases. 
+
+
+8. There is thread divergence and the threads that fall into one branch of the if/else will be synced with each other but the threads from the 2 branches will not be synced with each other. To preserve the semantics, take the __syncthreads() out of the two branches and put it at the end of the if/else statement. 
+
+
+

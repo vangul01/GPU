@@ -1,0 +1,33 @@
+Lecture 8 GPU
+
+Memory Alignment = for an element of size K, it must be stored at a memory location multiple of K
+with 2D arrays: sacrificing memory capacity for memory performance
+you can use cudaMallocPitch() so that it aligns everything well
+	this takes array, returns pitch, you input width and height and it finds the best pitch according to your inputs
+pitch is 1 row size
+
+DISADVANTAGE: it adds more complexity, can no longer just access i and j, you have to take pitch into account
+When you SHOULD USE: the bigger the matrix, the better to use
+	the more you use shared mem (higher CGMA), the less important pitch is
+pitch is a good technique to speedup memory access
+
+Multi-GPU System
+Flavors:
+1. only way for GPU to talk to another GPU is through CPU's
+2. 
+
+cudaMemCopy cannot copy to multiple GPUS deviceToDevice only copies within device
+copying global mem from one GPU to global mem of another GPU is inefficient
+
+Dynamic Parallelism: kernel can call another kernel
+ADVANTAGE: host is not involved, and recursion!
+	HOWEVER: thread will never be assumed finished unless all children are done so having threads calling more threads would be really bad, youd have thousands of threads using resources residing on a GPU
+		you can use an if condition, if threadID = 0 then...so that you only do recursion with one thread calling another kernel
+
+Another advantage: problems with various geometries...a thread can call a kernel with a different grid geometry 
+	ie: if looking at a picture, you can have a clearer picture in parts that matter
+
+Comes at the expense of shared mem, global mem, causes huge warp divergence
+You have to use synchronization
+*child grids always finish before parent grids
+

@@ -1,0 +1,15 @@
+10/10/11 Lecture 6 
+GPU
+
+shared memory means copied per block
+1000 blocks with 512 threads, local variable in kernel
+	1000 times executed in shared memory
+	152,000 times executed in global memory
+
+Number of threads matters! Not number of blocks...
+
+No pluses of less threads and more kernels
+Minuses are if you have more work per thread, that means you have less resources per block, perhaps less parallelization
+more threads less work means more parallelism but if you want to synchronize between threads
+
+Dynamic shared memory if you dont know size beforehand
